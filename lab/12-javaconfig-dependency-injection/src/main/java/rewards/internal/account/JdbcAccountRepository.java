@@ -5,6 +5,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
+import javax.annotation.PostConstruct;
 import javax.sql.DataSource;
 
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -21,6 +22,7 @@ public class JdbcAccountRepository implements AccountRepository {
 
 	/**
 	 * Sets the data source this repository will use to load accounts.
+	 * 
 	 * @param dataSource the data source
 	 */
 	public void setDataSource(DataSource dataSource) {
@@ -28,14 +30,16 @@ public class JdbcAccountRepository implements AccountRepository {
 	}
 
 	public Account findByCreditCard(String creditCardNumber) {
-		
-		String sql = "select a.ID as ID, a.NUMBER as ACCOUNT_NUMBER, a.NAME as ACCOUNT_NAME, c.NUMBER as CREDIT_CARD_NUMBER, " +
-			"	b.NAME as BENEFICIARY_NAME, b.ALLOCATION_PERCENTAGE as BENEFICIARY_ALLOCATION_PERCENTAGE, b.SAVINGS as BENEFICIARY_SAVINGS " +
-			"from T_ACCOUNT a, T_ACCOUNT_CREDIT_CARD c " +
-			"left outer join T_ACCOUNT_BENEFICIARY b " +
-			"on a.ID = b.ACCOUNT_ID " +
-			"where c.ACCOUNT_ID = a.ID and c.NUMBER = ?";
-		
+
+		String sql = "select a.ID as ID, a.NUMBER as ACCOUNT_NUMBER, a.NAME as ACCOUNT_NAME, c.NUMBER as CREDIT_CARD_NUMBER, "
+				+
+				"	b.NAME as BENEFICIARY_NAME, b.ALLOCATION_PERCENTAGE as BENEFICIARY_ALLOCATION_PERCENTAGE, b.SAVINGS as BENEFICIARY_SAVINGS "
+				+
+				"from T_ACCOUNT a, T_ACCOUNT_CREDIT_CARD c " +
+				"left outer join T_ACCOUNT_BENEFICIARY b " +
+				"on a.ID = b.ACCOUNT_ID " +
+				"where c.ACCOUNT_ID = a.ID and c.NUMBER = ?";
+
 		Account account = null;
 		Connection conn = null;
 		PreparedStatement ps = null;
@@ -108,11 +112,14 @@ public class JdbcAccountRepository implements AccountRepository {
 	}
 
 	/**
-	 * Map the rows returned from the join of T_ACCOUNT and T_ACCOUNT_BENEFICIARY to an fully-reconstituted Account
+	 * Map the rows returned from the join of T_ACCOUNT and T_ACCOUNT_BENEFICIARY to
+	 * an fully-reconstituted Account
 	 * aggregate.
+	 * 
 	 * @param rs the set of rows returned from the query
 	 * @return the mapped Account aggregate
-	 * @throws SQLException an exception occurred extracting data from the result set
+	 * @throws SQLException an exception occurred extracting data from the result
+	 *                      set
 	 */
 	private Account mapAccount(ResultSet rs) throws SQLException {
 		Account account = null;
@@ -137,19 +144,32 @@ public class JdbcAccountRepository implements AccountRepository {
 	}
 
 	/**
-	 * Maps the beneficiary columns in a single row to an AllocatedBeneficiary object.
+	 * Maps the beneficiary columns in a single row to an AllocatedBeneficiary
+	 * object.
+	 * 
 	 * @param rs the result set with its cursor positioned at the current row
 	 * @return an allocated beneficiary
-	 * @throws SQLException an exception occurred extracting data from the result set
+	 * @throws SQLException an exception occurred extracting data from the result
+	 *                      set
 	 */
 	private Beneficiary mapBeneficiary(ResultSet rs) throws SQLException {
 		String name = rs.getString("BENEFICIARY_NAME");
 		if (name == null) {
-			// apparently no beneficiary for this 
+			// apparently no beneficiary for this
 			return null;
-		}		
+		}
 		MonetaryAmount savings = MonetaryAmount.valueOf(rs.getString("BENEFICIARY_SAVINGS"));
 		Percentage allocationPercentage = Percentage.valueOf(rs.getString("BENEFICIARY_ALLOCATION_PERCENTAGE"));
 		return new Beneficiary(name, allocationPercentage, savings);
+	}
+
+	@PostConstruct
+	private void cacheDataSource() {
+		if (dataSource == null) {
+			throw new IllegalStateException("dataSource is null.  A DataSource must be provided in a constructor, " +
+					"or set via a 'dataSource' property.");
+		}
+
+		System.out.println("Account data cached...");
 	}
 }
